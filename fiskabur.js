@@ -1,7 +1,10 @@
 var canvas;
 var gl;
 
-var NumVertices  = 36;
+var NumVertices  = 17;
+var NumBody = 6;
+var NumFins = 6;
+var NumTail = 3;
 
 var points = [];
 var colors = [];
@@ -12,11 +15,49 @@ var spinY = 0;
 var origX;
 var origY;
 
+var rotTail = 0.0;        // Snúningshorn sporðs
+var incTail = 2.0;        // Breyting á snúningshorni sporðs
+var rotFins = 0.0;        // Snúningshorn uggga
+var incFins = 1.0;        // Breyting á snúningshorni ugga
+
 var zDist = -2.0;
 
+var proLoc;
+var colorLoc;
+var mvLoc
 var modelViewLoc;
 var projectionLoc;
 var projectionMatrix;
+
+var vertices = [
+        // Horn á fiskabúri
+        vec3( -0.5, -0.5,  0.5 ),
+        vec3( -0.5,  0.5,  0.5 ),
+        vec3(  0.5,  0.5,  0.5 ),
+        vec3(  0.5, -0.5,  0.5 ),
+        vec3( -0.5, -0.5, -0.5 ),
+        vec3( -0.5,  0.5, -0.5 ),
+        vec3(  0.5,  0.5, -0.5 ),
+        vec3(  0.5, -0.5, -0.5 ),
+        // líkami (spjald)
+        vec3( -0.5, -0.1, 0.0 ),
+        vec3(  0.5, -0.1, 0.0 ),
+        vec3( -0.5,  0.1, 0.0 ),
+        vec3( -0.5,  0.1, 0.0 ),
+        vec3(  0.5, -0.1, 0.0 ),
+        vec3(  0.5,  0.1, 0.0 ),
+        // ugggar (þríhyrningar)
+        vec3(  0.3,  0.0, 0.0 ),
+        vec3(  0.0,  0.0, 0.0 ),
+        vec3(  0.0,  0.0, 0.2 ),
+        vec3(  0.3,  0.0, 0.0 ),
+        vec3(  0.0,  0.0, 0.0 ),
+        vec3(  0.0,  0.0, -0.2 ),
+        // sporður (þríhyrningur)
+        vec3( -0.5,  0.0 , 0.0 ),
+        vec3( -1.0,  0.15, 0.0 ),
+        vec3( -1.0, -0.15, 0.0 )
+]
 
 window.onload = function init()
 {
@@ -25,10 +66,11 @@ window.onload = function init()
     gl = WebGLUtils.setupWebGL( canvas );
     if ( !gl ) { alert( "WebGL isn't available" ); }
 
-    colorCube();
+    fiskabur();
+    fiskur();
 
     gl.viewport( 0, 0, canvas.width, canvas.height );
-    gl.clearColor( 1.0, 1.0, 1.0, 1.0 );
+    gl.clearColor( 0.9, 1.0, 1.0, 1.0 );
 
     gl.enable(gl.DEPTH_TEST);
 
@@ -54,11 +96,18 @@ window.onload = function init()
     gl.vertexAttribPointer( vPosition, 3, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vPosition );
 
+    colorLoc = gl.getUniformLocation( program, "fColor" );
+
+    proLoc = gl.getUniformLocation( program, "projection" );
+    mvLoc = gl.getUniformLocation( program, "modelview" );
+
     modelViewLoc = gl.getUniformLocation( program, "modelViewMatrix" );
     projectionLoc = gl.getUniformLocation( program, "projectionMatrix" );
     projectionMatrix = perspective( 60.0, 1.0, 0.1, 100.0 );
     gl.uniformMatrix4fv(projectionLoc, false, flatten(projectionMatrix) );
 
+    var proj = perspective( 90.0, 1.0, 0.1, 100.0 );
+    gl.uniformMatrix4fv(proLoc, false, flatten(proj));
 
     //event listeners for mouse
     canvas.addEventListener("mousedown", function(e){
@@ -106,48 +155,21 @@ window.onload = function init()
     render();
 }
 
-function colorCube()
-{
-    quad( 1, 0, 3, 2 );
-    quad( 2, 3, 7, 6 );
-    quad( 3, 0, 4, 7 );
-    quad( 6, 5, 1, 2 );
-    quad( 4, 5, 6, 7 );
-    quad( 5, 4, 0, 1 );
-}
-
-function quad(a, b, c, d)
-{
-    var vertices = [
-        vec3( -0.5, -0.5,  0.5 ),
-        vec3( -0.5,  0.5,  0.5 ),
-        vec3(  0.5,  0.5,  0.5 ),
-        vec3(  0.5, -0.5,  0.5 ),
-        vec3( -0.5, -0.5, -0.5 ),
-        vec3( -0.5,  0.5, -0.5 ),
-        vec3(  0.5,  0.5, -0.5 ),
-        vec3(  0.5, -0.5, -0.5 )
-    ];
-
-    var vertexColors = [
-        [ 0.0, 0.0, 0.0, 1.0 ],  // black
-        [ 1.0, 0.0, 0.0, 1.0 ],  // red
-        [ 1.0, 1.0, 0.0, 1.0 ],  // yellow
-        [ 0.0, 1.0, 0.0, 1.0 ],  // green
-        [ 0.0, 0.0, 1.0, 1.0 ],  // blue
-        [ 1.0, 0.0, 1.0, 1.0 ],  // magenta
-        [ 0.0, 1.0, 1.0, 1.0 ],  // cyan
-        [ 1.0, 1.0, 1.0, 1.0 ]   // white
-    ];
-
-    var indices = [ a, b, c, a, c, d ];
+function fiskabur() {
+  var indices = [ 0, 1, 2, 3, 0, 4, 5, 1, 2, 6, 5, 4, 7, 6, 2, 3, 7];
 
     for ( var i = 0; i < indices.length; ++i ) {
         points.push( vertices[indices[i]] );
-        colors.push(vertexColors[a]);
+        colors.push([ 1.0, 0.0, 0.0, 1.0 ]);
     }
 }
 
+function fiskur() {
+  for ( var i = 8; i < vertices.length; ++i ) {
+      points.push( vertices[i] );
+      colors.push([ 1.0, 0.0, 1.0, 1.0 ]);
+  }
+}
 
 function render()
 {
@@ -157,52 +179,46 @@ function render()
     ctm = mult( ctm, rotateX(spinX) );
     ctm = mult( ctm, rotateY(spinY) ) ;
 
-    // Smíða hilluna
-    // Fyrst hliðarnar..
-    ctm1 = mult( ctm, translate( -0.4, 0.0, 0.0 ) );
-    ctm1 = mult( ctm1, scalem( 0.02, 1.0, 0.3 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm));
+    gl.drawArrays( gl.LINE_STRIP, 0, NumVertices );
 
-    ctm1 = mult( ctm, translate( 0.4, 0.0, 0.0 ) );
-    ctm1 = mult( ctm1, scalem( 0.02, 1.0, 0.3 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    rotTail += incTail;
+    if( rotTail > 35.0  || rotTail < -35.0 ){
+      incTail *= -1;
+    }
 
-    // svo toppurinn..
-    ctm1 = mult( ctm, translate( 0.0, 0.485, 0.0 ) );
-    ctm1 = mult( ctm1, scalem( 0.8, 0.02, 0.295 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    rotFins += incFins;
+    if( rotFins > 35.0  || rotFins < -35.0 ){
+      incFins *= -1;
+    }
 
-    // 3 hillur..
-    ctm1 = mult( ctm, translate( 0.0, 0.2, 0.0 ) );
-    ctm1 = mult( ctm1, scalem( 0.8, 0.02, 0.295 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    // Teikna líkama fisks (án snúnings)
+    //gl.uniform4fv( colorLoc, vec4(0.0, 0.0, 1.0, 1.0) );
 
-    ctm1 = mult( ctm, translate( 0.0, -0.1, 0.0 ) );
-    ctm1 = mult( ctm1, scalem( 0.8, 0.02, 0.295 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm));
+    gl.drawArrays( gl.TRIANGLES, 17, NumBody );
 
-    ctm1 = mult( ctm, translate( 0.0, -0.4, 0.0 ) );
-    ctm1 = mult( ctm1, scalem( 0.8, 0.02, 0.295 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    // Teikna ugga
+    //gl.uniform4fv( colorLoc, vec4(1.0, 0.0, 1.0, 1.0) );
+    ctm = mult( ctm, rotateX( rotFins ) );
+    gl.uniformMatrix4fv(proLoc, false, flatten(ctm));
+    gl.drawArrays( gl.TRIANGLES, NumBody+17, NumFins/2 );
 
-    // bakið..
-    ctm1 = mult( ctm, translate( 0.0, 0.04, 0.145 ) );
-    ctm1 = mult( ctm1, scalem( 0.8, 0.9, 0.01 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    //gl.uniform4fv( colorLoc, vec4(1.0, 0.0, 1.0, 1.0) );
+    ctm = mult( ctm, rotateX( -2*rotFins ) );
+    gl.uniformMatrix4fv(proLoc, false, flatten(ctm));
+    gl.drawArrays( gl.TRIANGLES, NumBody+3+17, NumFins/2 );
+    ctm = mult( ctm, rotateX( rotFins ) );
 
-    // sökkullinn..
-    ctm1 = mult( ctm, translate( 0.0, -0.45, -0.11 ) );
-    ctm1 = mult( ctm1, scalem( 0.8, 0.1, 0.02 ) );
-    gl.uniformMatrix4fv(modelViewLoc, false, flatten(ctm1));
-    gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
+    // Teikna sporð og snúa honum
+    //gl.uniform4fv( colorLoc, vec4(1.0, 0.0, 0.0, 1.0) );
 
+    ctm = mult( ctm, translate ( -0.5, 0.0, 0.0 ) );
+    ctm = mult( ctm, rotateY( rotTail ) );
+    ctm = mult( ctm, translate ( 0.5, 0.0, 0.0 ) );
+
+    gl.uniformMatrix4fv(proLoc, false, flatten(ctm));
+    gl.drawArrays( gl.TRIANGLES, NumBody+NumFins+17, NumTail );
 
     requestAnimFrame( render );
 }

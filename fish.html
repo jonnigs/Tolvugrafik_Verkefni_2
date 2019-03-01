@@ -1,22 +1,15 @@
-<!DOCTYPE html>
 <html>
-<head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-<title>Fiskabúr</title>
-
 <script id="vertex-shader" type="x-shader/x-vertex">
 
 attribute  vec4 vPosition;
-attribute  vec4 vColor;
-varying vec4 fColor;
 
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
+uniform mat4 projection;
+uniform mat4 modelview;
 
 void main()
 {
-    fColor = vColor;
-    gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+    gl_Position = projection * modelview * vPosition;
 }
 </script>
 
@@ -24,7 +17,7 @@ void main()
 
 precision mediump float;
 
-varying vec4 fColor;
+uniform vec4 fColor;
 
 void
 main()
@@ -36,11 +29,14 @@ main()
 <script type="text/javascript" src="../webgl-utils.js"></script>
 <script type="text/javascript" src="../initShaders.js"></script>
 <script type="text/javascript" src="../MV.js"></script>
-<script type="text/javascript" src="fiskabur.js"></script>
+<script type="text/javascript" src="fish.js"></script>
 
 <body>
-<canvas id="gl-canvas" width="512" height="512">
+<canvas id="gl-canvas" width="500" height="500">
 Oops ... your browser doesn't support the HTML5 canvas element
 </canvas>
+
+<br/>
+<h2> Ýtið á "A" til að fá fram alignment hluta hjarðhegðunar</h2>
 </body>
 </html>
